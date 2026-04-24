@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Flask Backend
+  backend:
+    build: .
+    container_name: crop2x-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://crop2x:password@postgres:5432/crop2x_db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./logs:/app/logs
+      - ./policies:/app/policies
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - crop2x-network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:13-alpine
+    container_name: crop2x-postgres
+    environment:
+      - POSTGRES_USER=crop2x
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=crop2x_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - crop2x-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: crop2x-redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - crop2x-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: crop2x-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+    networks:
+      - crop2x-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  crop2x-network:
+    driver: bridge
