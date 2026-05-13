@@ -7,59 +7,39 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/chatbot.css') }}">
 </head>
 <body>
+
     <div id="chatbot-container" class="chatbot-container">
-        <div class="chatbot-header">
-            <div class="header-content">
-                <h2>🌾 Crop2X Assistant</h2>
-                <p>How can we help you?</p>
-            </div>
-            <button id="minimize-btn" class="minimize-btn">−</button>
-        </div>
         
-        <div id="chatbot-body" class="chatbot-body">
-            <div id="messages-container" class="messages-container">
-                <div class="message bot-message">
-                    <div class="message-content">
-                        <p>👋 Welcome to Crop2X!</p>
-                        <p>I'm here to help you with agriculture solutions.</p>
-                        <p>Are you a:</p>
-                        <div class="quick-replies">
-                            <button class="quick-reply" onclick="selectUserType('farmer')">🌱 Farmer</button>
-                            <button class="quick-reply" onclick="selectUserType('partner')">🤝 Partner</button>
-                            <button class="quick-reply" onclick="selectUserType('enterprise')">🏢 Enterprise</button>
-                        </div>
+        <div id="chat-screen" class="chat-screen" style="display: flex;">
+            <div class="chatbot-header">
+                <h2>🌾 Crop2X Assistant</h2>
+                <button id="minimize-btn" class="minimize-btn">−</button>
+            </div>
+            
+            <div id="chatbot-body" class="chatbot-body">
+                <div id="messages-container" class="messages-container">
+                    <div class="message bot-message">
+                        <p>👋 <strong>Welcome to Crop2X.</strong> I'm your assistant. Ask me about our services, or anything covered in the document your administrator uploaded. How can I help you today?</p>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="chatbot-footer">
-            <div class="input-group">
-                <input 
-                    type="text" 
-                    id="message-input" 
-                    class="message-input" 
-                    placeholder="Type your message..."
-                    onkeypress="handleKeyPress(event)"
-                >
-                <button id="send-btn" class="send-btn" onclick="sendMessage()">📤</button>
+
+            <div class="chatbot-footer">
+                <input type="text" id="message-input" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()">📤</button>
+                <button onclick="connectWhatsApp()" class="whatsapp-btn">WhatsApp</button>
             </div>
-            <p class="footer-note">Powered by Crop2X AI</p>
         </div>
     </div>
     
-    <!-- Lead Form Modal -->
     <div id="lead-form-modal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeLeadForm()">&times;</span>
+            <span class="close" onclick="document.getElementById('lead-form-modal').style.display='none'">&times;</span>
             <h3>Share Your Details</h3>
-            <form id="lead-form" onsubmit="submitLeadForm(event)">
+            <form id="lead-form" onsubmit="event.preventDefault();">
                 <input type="text" id="lead-name" placeholder="Your Name" required>
                 <input type="email" id="lead-email" placeholder="Email Address" required>
                 <input type="tel" id="lead-phone" placeholder="Phone Number">
-                <input type="text" id="lead-location" placeholder="Location" required>
-                <input type="text" id="lead-farm-size" placeholder="Farm Size (optional)">
-                <textarea id="lead-message" placeholder="Additional Message" rows="4"></textarea>
                 <button type="submit" class="submit-btn">Send</button>
             </form>
         </div>

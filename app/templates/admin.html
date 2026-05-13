@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crop2X — Admin (Knowledge base)</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chatbot.css') }}">
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f4f7f2; margin: 0; padding: 24px; }
+        .admin-wrap { max-width: 520px; margin: 0 auto; }
+        .admin-card {
+            background: #fff; border-radius: 12px; padding: 28px;
+            box-shadow: 0 4px 20px rgba(0,0,0,.08); border: 1px solid #e0e6da;
+        }
+        .admin-card h2 { margin-top: 0; color: #2d4a22; }
+        .muted { color: #5c6656; font-size: 0.95rem; line-height: 1.5; }
+        .user-link {
+            display: inline-block; margin-top: 16px; padding: 10px 16px;
+            background: #e8f5e9; color: #1b5e20; border-radius: 8px; text-decoration: none;
+            font-weight: 600; border: 1px solid #a5d6a7;
+        }
+        .user-link:hover { background: #c8e6c9; }
+        #extraction-box {
+            margin-top: 16px; padding: 14px; background: #f8faf6; border-radius: 8px;
+            text-align: left; font-size: 0.9rem; display: none; border: 1px solid #e0e6da;
+        }
+        #extraction-box pre { white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; font-size: 0.82rem; color: #333; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; background: #fff3e0; color: #e65100; }
+    </style>
+</head>
+<body>
+    <div class="admin-wrap">
+        <p class="badge">Admin only — upload the knowledge PDF here</p>
+        <div class="admin-card">
+            <h2>Knowledge base (PDF)</h2>
+            <p class="muted">
+                Upload a PDF here; text will be extracted and the <strong>user chatbot</strong> will answer from it.
+                End users <strong>cannot</strong> upload PDFs from the chatbot.
+            </p>
+            <input type="file" id="admin-pdf-file" accept="application/pdf" style="margin: 16px 0; width: 100%;">
+            <button type="button" onclick="uploadAsAdmin()" class="submit-btn" id="upload-btn" style="width: 100%;">
+                Upload PDF &amp; extract for chatbot
+            </button>
+            <p id="status-msg" style="margin-top: 14px; min-height: 1.2em;"></p>
+            <div id="extraction-box">
+                <strong>Extraction summary</strong>
+                <div id="extraction-meta"></div>
+                <strong style="display:block;margin-top:10px;">Preview (start of text)</strong>
+                <pre id="extraction-preview"></pre>
+            </div>
+            <a class="user-link" href="/">→ Open user chatbot (home)</a>
+        </div>
+    </div>
+
+    <script>
+    async function uploadAsAdmin() {
+        const fileInput = document.getElementById('admin-pdf-file');
+        const status = document.getElementById('status-msg');
+        const box = document.getElementById('extraction-box');
+        const meta = document.getElementById('extraction-meta');
+        const prev = document.getElementById('extraction-preview');
+        if (!fileInput.files[0]) return alert('Please choose a PDF file first.');
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        status.style.color = '#333';
+        status.innerText = 'Uploading and extracting text…';
+        box.style.display = 'none';
+        document.getElementById('upload-btn').disabled = true;
+
+        try {
+            const res = await fetch('/api/chatbot/admin/upload-policy', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.success) {
+                status.style.color = 'green';
+                status.innerText = '✅ ' + (data.message || 'Done.');
+                const ex = data.extraction || {};
+                meta.innerHTML =
+                    'Pages: <strong>' + (ex.pages ?? '—') + '</strong> · ' +
+                    'Characters: <strong>' + (ex.characters ?? '—') + '</strong> · ' +
+                    'Readable text: <strong>' + (ex.has_readable_text ? 'Yes' : 'No') + '</strong>';
+                prev.textContent = ex.preview || '(No preview — PDF may be empty or image-only.)';
+                box.style.display = 'block';
+            } else {
+                status.style.color = 'red';
+                status.innerText = '❌ ' + (data.error || 'Error');
+            }
+        } catch (e) {
+            status.style.color = 'red';
+            status.innerText = 'Server / network error.';
+        } finally {
+            document.getElementById('upload-btn').disabled = false;
+        }
+    }
+    </script>
+</body>
+</html>

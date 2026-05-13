@@ -1,9 +1,10 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime
 from app import db
 from app.models import User, ChatLog
 from app.services.ai_response_engine import AIResponseEngine
 from app.services.whatsapp_service import WhatsAppService
+from app.services.pdf_policy_scanner import PDFPolicyScanner
+import os
 
 chatbot_bp = Blueprint('chatbot', __name__)
 
@@ -43,11 +44,15 @@ def init_chat():
             user.user_type = user_type
             db.session.commit()
         
+        kb_path = os.path.join('uploads', 'current_policy.pdf')
+        has_document = os.path.isfile(kb_path)
+
         return jsonify({
             'success': True,
             'user_id': user.id,
             'user_type': user.user_type,
-            'message': 'Chat initialized successfully'
+            'message': 'Chat initialized successfully',
+            'has_knowledge_document': has_document,
         }), 200
     except Exception as e:
         return jsonify({
@@ -82,12 +87,14 @@ def send_message():
             user_type=user.user_type,
             context={'location': user.location}
         )
+
+        bot_text = response_data.get('response') or response_data.get('message', '')
         
         # Store chat log
         chat_log = ChatLog(
             user_id=user_id,
             user_message=user_message,
-            bot_response=response_data['message'],
+            bot_response=bot_text,
             response_type=response_data.get('cta', 'text'),
             policies_used=response_data.get('policies_referenced', [])
         )
@@ -97,9 +104,9 @@ def send_message():
         return jsonify({
             'success': True,
             'chat_id': chat_log.id,
-            'response': response_data['message'],
+            'response': bot_text,
             'next_action': response_data.get('next_action'),
-            'cta': response_data.get('cta'),  # Call-to-action: 'whatsapp', 'lead_form', etc.
+            'cta': response_data.get('cta'),
             'policies_referenced': response_data.get('policies_referenced', [])
         }), 200
     except Exception as e:
@@ -139,23 +146,57 @@ def get_chat_history(user_id):
             'error': str(e)
         }), 500
 
+@chatbot_bp.route('/knowledge-status', methods=['GET'])
+def knowledge_status():
+    """User chatbot: bataye ke admin ki PDF maujood hai aur text extract hua ya nahi (upload sirf admin)."""
+    try:
+        upload_dir = 'uploads'
+        file_path = os.path.join(upload_dir, 'current_policy.pdf')
+        if not os.path.exists(file_path):
+            return jsonify({
+                'success': True,
+                'ready': False,
+                'has_file': False,
+                'pages': 0,
+                'characters': 0,
+                'hint': 'An administrator can upload a PDF from the /admin page. End users cannot upload documents.',
+            }), 200
+
+        scanner = PDFPolicyScanner(file_path)
+        scanner.extract_policies()
+        text = scanner.policies.get('content', '') or ''
+        chars = len(text.strip())
+        ready = chars > 0
+
+        return jsonify({
+            'success': True,
+            'ready': ready,
+            'has_file': True,
+            'pages': scanner.page_count,
+            'characters': chars,
+            'hint': None if ready else 'A PDF is present but no text could be extracted — it may be a scanned image. Ask your admin to upload a text-based PDF.',
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @chatbot_bp.route('/policies', methods=['GET'])
 def get_policies():
-    """Get available policies"""
+    """Get available policies for the user chatbot"""
     try:
-        from app.services.pdf_policy_scanner import PDFPolicyScanner
-        scanner = PDFPolicyScanner('')
-        policies = scanner.get_cached_policies()
+        # User screen will call this to get the knowledge base
+        upload_dir = 'uploads'
+        file_path = os.path.join(upload_dir, 'current_policy.pdf')
         
-        if not policies:
-            policies = scanner._get_dummy_policies()
+        if not os.path.exists(file_path):
+            return jsonify({'success': False, 'error': 'No policy uploaded by admin yet'}), 404
+
+        scanner = PDFPolicyScanner(file_path)
+        policies = scanner.extract_policies()
         
         return jsonify({
             'success': True,
             'policies': policies
         }), 200
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
